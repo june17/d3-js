@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title></title>
+  </head>
+  <style>
+    body, html{
+      margin: 0;
+      width: 100%;
+      background-color: #fff;
+      font-family: helvetica;
+      margin: auto;
+    }
+    .scatter-container{
+      margin-left: 15%;
+      width: 85%;
+      float: left;
+      height: 275px;
+    }
+    .detail{
+      width: 10%;
+      float: left;
+      height: 300px;
+    }
+    scatter{
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+      overflow: hidden;
+      font-size: 10px;
+    }
+    scatter circle{
+      fill: #00ca85;
+      opacity: 1;
+      cursor: pointer;
+      stroke-width: 2;
+    }
+    scatter circle:hover{
+      stroke: #00ca85;
+    }
+    scatter text{
+      fill: #aaa;
+      stroke: none;
+    }
+    scatter .x-axis path, scatter .y-axis path{
+      stroke: none;
+      fill: none;
+    }
+    scatter .x-axis line{
+      stroke: none;
+    }
+    scatter .y-axis line{
+      stroke:#f2f2f2;
+    }
+  </style>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.10/angular.min.js"></script>
+  <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+  <body ng-app="myApp" ng-controller="MainCtrl">
+    <div class="scatter-container">
+      <scatter data="employers" selected-point="selectEmployer"> </scatter>
+    </div>
+    <div class="detail">
+      <div >
+        <p>Date {{selectEmployer.date}}</p>
+        <p>Number of Applicants : {{selectEmployer.count}}</p>
+      </div>
+    </div>
+  </body>
+  <script>
+
+var app = angular.module('myApp', []);
+
+app.controller('MainCtrl', ['$scope','$http', '$window', function($scope, $http, $window){
+  $scope.employers = [];
+    $http.get('applicants.json').success(function(data){   
+      $scope.employers=data;
+      });
+}]);
+
+
+app.directive('scatter', function(){
+  function link(scope, el, attr){
+    el = el[0];
+    var w, h;
+    var svg = d3.select(el).append('svg');
+    var xAxisG = svg.append('g').attr('class', 'x-axis');
+    var yAxisG = svg.append('g').attr('class', 'y-axis');
+    var points = svg.append('g').attr('class', 'points').selectAll('g.point');
+    var x = d3.scale.linear();
+    var y = d3.scale.linear();
+    var xAxis = d3.svg.axis().scale(x).orient('bottom')
+      .tickFormat(function(d, i){ return i + 1; }); // 1 index the company ranks
+    var yAxis = d3.svg.axis().scale(y).orient('left');
+    var m = 50;
+
+    scope.$watch(function(){
+      w = el.clientWidth;
+      h = el.clientHeight;
+      return w + h;
+    }, resize);
+
+    function resize(){
+      svg.attr({width: w, height: h});
+      x.range([m, w - m]);
+      y.range([h - m, m]);
+      xAxis.tickSize(-h + 2 * m);
+      yAxis.tickSize(-w + 2 * m);
+      xAxisG.attr('transform', 'translate(' + [0, y.range()[0] + 0.5] + ')');
+      yAxisG.attr('transform', 'translate(' + [x.range()[0], 0] + ')');
+      update();
+    }
+
+    scope.$watch('data', update);
+
+    function update(){
+      if(!scope.data){ return };
+      var data = scope.data;
+      var x_extent = d3.extent(data, function(d, i){ return i });
+      x.domain(x_extent);
+      var y_max = d3.max(data, function(d){ return d.count });
+      y.domain([0, y_max]);
+      points = points.data(data);
+      points.exit().remove();
+      var point = points.enter().append('g').attr('class', 'point');
+      point.append('circle').attr('r', 8)
+        .on('mouseover', function(d){
+          scope.$apply(function(){
+            scope.selectedPoint = d;
+          });
+        });
+
+      // update the position of all the points
+      points.attr('transform', function(d, i){
+        return 'translate(' + [x(i), y(d.count)] + ')';
+      });
+
+      xAxisG.call(xAxis);
+      yAxisG.call(yAxis);
+
+    };
+  }
+  return {
+    link: link,
+    restrict: 'E',
+    scope: { data: '=', selectedPoint: '=' }
+  };
+});
+  </script>
+</html>
